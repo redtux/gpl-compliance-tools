@@ -1,0 +1,220 @@
+#!/usr/bin/perl -w
+# hierarchy-comparison                                            -*- Perl -*-
+#   Possible bug: only -type f and -type d are checked
+# Copyright (C) 2001, 2002, 2003, 2004, 2008 Bradley M. Kuhn <bkuhn@ebb.org>
+#
+# This software's license gives you freedom; you can copy, convey,
+# propogate, redistribute and/or modify this program under the terms of
+# the GNU  General Public License (GPL) as published by the Free
+# Software Foundation (FSF), either version 3 of the License, or (at your
+# option) any later version of the GPL published by the FSF.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program in a file in the toplevel directory called
+# "GPLv3".  If not, see <http://www.gnu.org/licenses/>.
+#
+
+use strict;
+
+use POSIX qw(tmpnam);
+use Cwd;
+
+my $VERSION = '1.1';
+my $DO_DIFF = 1;
+
+######################################################################
+sub FindAndSortOutput {
+  use File::Find;
+
+  my($type, $dir, $output, $ignoreRegex, $filterRewrite) = @_;
+  my @files;
+
+  my $buildList = sub {
+    my $val = $_;
+    chomp $val;
+    $val =~ s/$filterRewrite// if defined $filterRewrite;
+    if ($type eq "NON-REGULAR") {
+      push(@files, $val) unless -f $_;
+    } elsif ($type eq "FILES") {
+      push(@files, $val) if -f $_;
+    } elsif ($type eq "DIRECTORY") {
+      push(@files, $val) if -d $_;
+    } else {
+      die "Unknown type requested: $type";
+    }
+  };
+
+  find({ wanted => $buildList, no_chdir => 1},  $dir);
+
+  open(FILE_OUTPUT, ">$output") or
+    die "$0: unablet open temporary output file, $output: $!";
+
+  my @sortedChompedFiles;
+  foreach my $file (sort {$a cmp $b } @files) {
+    chomp $file;
+    next if defined $ignoreRegex and $file =~ /$ignoreRegex/;
+    push(@sortedChompedFiles, $file);
+    print FILE_OUTPUT "$file\n";
+  }
+  close FILE_OUTPUT;
+
+  return @sortedChompedFiles;
+}
+######################################################################
+sub MD5SumFiles {
+  my($dir, $fileListRef, $outputFile) = @_;
+
+  my $curdir = getcwd();
+
+  chdir $dir or die "unable to change to $dir: $0";
+
+#  open(FILE_OUTPUT, "|/usr/bin/xargs /usr/bin/md5sum >$outputFile 2>&1")
+  open(FILE_OUTPUT, "|/usr/bin/xargs -0 /usr/bin/sha1sum >$outputFile")
+    or die "unable to write to $outputFile: $!";
+
+  foreach my $file (@{$fileListRef}) {
+    print FILE_OUTPUT "$file\000";
+  }
+  close FILE_OUTPUT;
+  die "$0: error running xargs to md5sum command; $!" unless ($? == 0);
+
+  open(FILE_INPUT, "<", $outputFile) or die "unable to read back in $outputFile: $!";
+  my %files2sha1;
+  while (my $line = <FILE_INPUT>) {
+    chomp $line;
+    die "$outputFile has a strange line, \"$line\""
+      unless $line =~ /^(\S+)\s+(.+)$/;
+    $files2sha1{$2} = $1;
+  }
+  close FILE_INPUT;
+
+  chdir $curdir or die "$0: cannot go back into $curdir: $!";
+  return \%files2sha1;
+}
+######################################################################
+
+if (@ARGV != 3 and @ARGV != 4) {
+  print "usage: $0 <ORIG_DIRECTORY> ",
+        "<COMPARED_DIRECTORY> <DIFF_OUTPUT_FILE> [<IGNORED_FILES_REGEX>]\n";
+  exit 2;
+}
+
+my($origDir, $comparedDir, $diffOutputFile, $ignoreRegex) = @ARGV;
+
+$origDir =~ s%/\s*$%%;
+$comparedDir =~ s%/\s*$%%;
+
+my $origTempFile = POSIX::tmpnam();
+my $comparedTempFile = POSIX::tmpnam();
+
+# First, look for directory differences
+
+print "Doing directory comparision: ";
+
+my(@orgNonRegular) = FindAndSortOutput("NON-REGULAR", $origDir, $origTempFile,
+                                 $ignoreRegex, "^/?($origDir|$comparedDir)/?");
+my(@comparedNonRegular) = FindAndSortOutput("NON-REGULAR", $comparedDir,
+                                      $comparedTempFile, $ignoreRegex,
+                                            "^/?($origDir|$comparedDir)/?");
+
+system(
+     "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
+
+my $diffExitCode = $?;
+unlink($origTempFile, $comparedTempFile);
+
+if ($diffExitCode == 2) {
+  print "\n";
+  die "$0: error trying to diff files: $!";
+} elsif ($diffExitCode == 0) {
+  print "directory structures match.\n";
+} else {
+  print "differences found in directory structures.\n",
+    "See $diffOutputFile for more information.\n";
+}
+
+# Now, see if the files are all the same
+
+print "Doing file hierarchy comparision: ";
+
+my(@orgFiles) = FindAndSortOutput("FILES", $origDir, $origTempFile,
+                                 $ignoreRegex, "^/?($origDir|$comparedDir)/?");
+my(@comparedFiles) = FindAndSortOutput("FILES", $comparedDir,
+                                       $comparedTempFile, $ignoreRegex, "^/?($origDir|$comparedDir)/?");
+
+system(
+     "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
+
+$diffExitCode = $?;
+
+if ($diffExitCode == 2) {
+  print "\n";
+  die "$0: error trying to diff files: $!";
+} elsif ($diffExitCode == 0) {
+  print "both contain the same list of files.\n";
+} else {
+  print "differences found in file hierarchies.\n",
+    "See $diffOutputFile for more information.\n";
+}
+
+# Now, diff the md5sums of the files.
+
+print "Doing file contents comparisons: ";
+
+# Assume that the two lists were the same, and come down to the list of
+# shared files.
+
+my(%origH, %comparedH);
+
+@origH{@orgFiles} = @orgFiles;
+@comparedH{@comparedFiles} = @comparedFiles;
+
+my %final;
+
+foreach my $ii (@orgFiles, @comparedFiles) {
+  $final{$ii} = $ii
+    if defined $origH{$ii} and defined $comparedH{$ii};
+}
+my(@o, @c);
+@o = keys %final;
+@c = keys %final;
+
+my $origFiles2sha1 =  MD5SumFiles($origDir, \@o, $origTempFile);
+my $comparedFiles2sha1 = MD5SumFiles($comparedDir, \@c, $comparedTempFile);
+
+system(
+     "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
+
+$diffExitCode = $?;
+unlink($origTempFile, $comparedTempFile);
+
+if ($DO_DIFF) {
+  foreach my $file (keys %final) {
+    if ($origFiles2sha1->{$file} ne $comparedFiles2sha1->{$file}) {
+      system(
+             "/usr/bin/diff -u \"$origDir/$file\" \"$comparedDir/$file\" >> $diffOutputFile 2>&1");
+    }
+  }
+}
+if ($diffExitCode == 2) {
+  print "\n";
+  die "$0: error trying to diff files: $!";
+} elsif ($diffExitCode == 0) {
+  print "all files match.\n";
+} else {
+  print "differences found in some files.\n",
+    "See $diffOutputFile for more information.\n";
+  exit 1;
+}
+
+exit 0;
+
+#
+# Local variables:
+# compile-command: "perl -c hierarchy-comparison"
+# End:
