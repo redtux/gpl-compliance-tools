@@ -1,7 +1,26 @@
 #!/usr/bin/perl
-#By Michael Holzt, DL3KJU, kju@fqdn.org, kju@debian.org, kju@IRCNet
-#edited by novalis
-# impoved by bkuhn over a period of 2005-2010.
+#
+# Copyright (C) 2003, Michael Holzt <michael@holzt.de> (as splitgzip.pl)
+#                     DL3KJU, kju@fqdn.org, kju@debian.org, kju@IRCNet
+#
+# Copyright (C) 2003, 2004, David 'novalis' Turner <novalis@novalis.org>
+# Copyright (C) 2005, 2006, 2007, Free Software Foundation, Inc. <licensing@fsf.org>
+# Copyright (C) 2005, 2007, 2010  Bradley M. Kuhn    <bkuhn@ebb.org>
+
+# This software's license gives you freedom; you can copy, convey,
+# propogate, redistribute and/or modify this program under the terms of
+# the GNU  General Public License (GPL) as published by the Free
+# Software Foundation (FSF), either version 3 of the License, or (at your
+# option) any later version of the GPL published by the FSF.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program in a file in the toplevel directory called
+# "GPLv3".  If not, see <http://www.gnu.org/licenses/>.
 
 use strict;
 
