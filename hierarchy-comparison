@@ -53,7 +53,7 @@ sub FindAndSortOutput {
   find({ wanted => $buildList, no_chdir => 1},  $dir);
 
   open(FILE_OUTPUT, ">$output") or
-    die "$0: unablet open temporary output file, $output: $!";
+    die "$0: unable to open temporary output file, $output: $!";
 
   my @sortedChompedFiles;
   foreach my $file (sort {$a cmp $b } @files) {
