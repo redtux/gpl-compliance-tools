@@ -115,7 +115,7 @@ my $comparedTempFile = POSIX::tmpnam();
 
 # First, look for directory differences
 
-print "Doing directory comparision: ";
+print "Doing directory comparison: ";
 
 my(@orgNonRegular) = FindAndSortOutput("NON-REGULAR", $origDir, $origTempFile,
                                  $ignoreRegex, "^/?($origDir|$comparedDir)/?");
@@ -143,7 +143,7 @@ if ($diffExitCode == 2) {
 
 # Now, see if the files are all the same
 
-print "Doing file hierarchy comparision: ";
+print "Doing file hierarchy comparison: ";
 
 my(@orgFiles) = FindAndSortOutput("FILES", $origDir, $origTempFile,
                                  $ignoreRegex, "^/?($origDir|$comparedDir)/?");
