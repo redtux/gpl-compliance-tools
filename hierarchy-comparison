@@ -2,6 +2,7 @@
 # hierarchy-comparison                                            -*- Perl -*-
 #   Possible bug: only -type f and -type d are checked
 # Copyright (C) 2001, 2002, 2003, 2004, 2008 Bradley M. Kuhn <bkuhn@ebb.org>
+# Copyright (C) 2011 Denver Gingerich <denver@ossguy.com>
 #
 # This software's license gives you freedom; you can copy, convey,
 # propogate, redistribute and/or modify this program under the terms of
@@ -122,6 +123,8 @@ my(@comparedNonRegular) = FindAndSortOutput("NON-REGULAR", $comparedDir,
                                       $comparedTempFile, $ignoreRegex,
                                             "^/?($origDir|$comparedDir)/?");
 
+# TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
+system("/bin/echo Directory comparison: >> $diffOutputFile 2>&1");
 system(
      "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
 
@@ -146,6 +149,10 @@ my(@orgFiles) = FindAndSortOutput("FILES", $origDir, $origTempFile,
                                  $ignoreRegex, "^/?($origDir|$comparedDir)/?");
 my(@comparedFiles) = FindAndSortOutput("FILES", $comparedDir,
                                        $comparedTempFile, $ignoreRegex, "^/?($origDir|$comparedDir)/?");
+
+# TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
+system("/bin/echo >> $diffOutputFile 2>&1");
+system("/bin/echo File hierarchy comparison: >> $diffOutputFile 2>&1");
 
 system(
      "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
@@ -187,11 +194,19 @@ my(@o, @c);
 my $origFiles2sha1 =  MD5SumFiles($origDir, \@o, $origTempFile);
 my $comparedFiles2sha1 = MD5SumFiles($comparedDir, \@c, $comparedTempFile);
 
+# TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
+system("/bin/echo >> $diffOutputFile 2>&1");
+system("/bin/echo 'File contents comparisons (MD5):' >> $diffOutputFile 2>&1");
+
 system(
      "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
 
 $diffExitCode = $?;
 unlink($origTempFile, $comparedTempFile);
+
+# TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
+system("/bin/echo >> $diffOutputFile 2>&1");
+system("/bin/echo 'File contents comparisons (diff):' >> $diffOutputFile 2>&1");
 
 if ($DO_DIFF) {
   foreach my $file (keys %final) {
