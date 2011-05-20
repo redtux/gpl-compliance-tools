@@ -188,8 +188,8 @@ foreach my $ii (@orgFiles, @comparedFiles) {
     if defined $origH{$ii} and defined $comparedH{$ii};
 }
 my(@o, @c);
-@o = keys %final;
-@c = keys %final;
+@o = sort(keys %final);
+@c = sort(keys %final);
 
 my $origFiles2sha1 =  MD5SumFiles($origDir, \@o, $origTempFile);
 my $comparedFiles2sha1 = MD5SumFiles($comparedDir, \@c, $comparedTempFile);
@@ -212,7 +212,7 @@ system("/bin/echo >> $diffOutputFile 2>&1");
 system("/bin/echo 'File contents comparisons (diff):' >> $diffOutputFile 2>&1");
 
 if ($DO_DIFF) {
-  foreach my $file (keys %final) {
+  foreach my $file (sort(keys %final)) {
     if ($origFiles2sha1->{$file} ne $comparedFiles2sha1->{$file}) {
       system(
              "/usr/bin/diff -u \"$origDir/$file\" \"$comparedDir/$file\" >> $diffOutputFile 2>&1");
