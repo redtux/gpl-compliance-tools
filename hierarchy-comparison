@@ -198,8 +198,11 @@ my $comparedFiles2sha1 = MD5SumFiles($comparedDir, \@c, $comparedTempFile);
 system("/bin/echo >> $diffOutputFile 2>&1");
 system("/bin/echo 'File contents comparisons (MD5):' >> $diffOutputFile 2>&1");
 
+# for C&CS checking, the list of files that are the same (esp. binary) is useful
+#  so use infinite number of lines of context to show these files
+# TODO: replace -U[big_number] with proper infinite context flag (ossguy)
 system(
-     "/usr/bin/diff -u $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
+     "/usr/bin/diff -U2000000000 $origTempFile $comparedTempFile >> $diffOutputFile 2>&1");
 
 $diffExitCode = $?;
 unlink($origTempFile, $comparedTempFile);
