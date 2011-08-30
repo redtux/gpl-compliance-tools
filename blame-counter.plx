@@ -83,11 +83,13 @@ while (my $dataLine = <DATA_FILE>) {
   }
 }
 close DATA_FILE;
-foreach my $file (sort keys %data) {
+foreach my $file (sort { $data{$b}{confirmedCommits} <=> $data{$a}{confirmedCommits} }
+                  keys %data) {
   next if $data{$file}{commitsInRange} == 0 or  $data{$file}{confirmedCommits} == 0;
 
-  print sprintf("%s has %d lines from commits in range and %d of those lines are on confirmed list\n",
-    $file, $data{$file}{commitsInRange}, $data{$file}{confirmedCommits});
+  print sprintf("%6d lines confirmed in %38s:  (%6d in range), making %6.2f%% of file from confirmed list\n",
+    $data{$file}{confirmedCommits}, $file, $data{$file}{commitsInRange},
+($data{$file}{confirmedCommits} / $data{$file}{commitsInRange}) * 100.00);
 }
 #
 # Local variables:
