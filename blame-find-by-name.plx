@@ -49,7 +49,6 @@ while (my $dataLine = <DATA_FILE>) {
     die "invalid line: $dataLine in blame output" unless ($dataLine =~
       /^\s*(\S+)\s+\S+\s+\d+\s+\((.+)\s+(\d{4,4}\-\d{2,2}\-\d{2,2}\s+\d{2,2}:\d{2,2}:\d{2,2})\s+([\+\-\d]+)\s+(\d+)\s*\)\s+(.*)$/);
     my($commitID, $name, $date, $tz, $curLineNumber, $actualCurrentLine) = ($1, $2, $3, $4, $5, $6);
-
     if ($name =~ /$NAME_REGEX/i) {
       $commitsMatchingRegex{$commitID} = { __totalLines => 0 } unless defined $commitsMatchingRegex{$commitID};
       $commitsMatchingRegex{$commitID}{$currentFile} = 0 unless defined $commitsMatchingRegex{$commitID}{$currentFile};
@@ -59,7 +58,7 @@ while (my $dataLine = <DATA_FILE>) {
   }
 }
 close DATA_FILE;
-foreach my $commitID (sort { $commitsMatchingRegex{$a}{__totalLines} <=> $commitsMatchingRegex{$b}{__totalLines} } keys %commitsMatchingRegex ) {
+foreach my $commitID (sort { $commitsMatchingRegex{$b}{__totalLines} <=> $commitsMatchingRegex{$a}{__totalLines} } keys %commitsMatchingRegex ) {
   print sprintf("%s: %d\n", $commitID, $commitsMatchingRegex{$commitID}{__totalLines});
 }
 #
