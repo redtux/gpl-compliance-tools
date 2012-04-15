@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # hierarchy-comparison                                            -*- Perl -*-
 #   Possible bug: only -type f and -type d are checked
-# Copyright (C) 2001, 2002, 2003, 2004, 2008, 2011 Bradley M. Kuhn <bkuhn@ebb.org>
+# Copyright (C) 2001, 2002, 2003, 2004, 2008, 2011, 2012 Bradley M. Kuhn <bkuhn@ebb.org>
 # Copyright (C) 2011 Denver Gingerich <denver@ossguy.com>
 #
 # This software's license gives you freedom; you can copy, convey,
@@ -22,17 +22,16 @@
 
 use strict;
 
-use POSIX qw(tmpnam);
+use File::Temp qw/tempfile/;
 use Cwd;
 
 my $VERSION = '1.1';
 my $DO_DIFF = 1;
 
 ######################################################################
-sub FindAndSortOutput {
+sub FindAndSortOutput ($$$$$) {
+  my($type, $dir, $outputFH, $ignoreRegex, $filterRewrite) = @_;
   use File::Find;
-
-  my($type, $dir, $output, $ignoreRegex, $filterRewrite) = @_;
   my @files;
 
   my $buildList = sub {
@@ -42,8 +41,8 @@ sub FindAndSortOutput {
     if ($type eq "NON-REGULAR") {
       push(@files, $val) unless -f $_;
     } elsif ($type eq "FILES") {
-      push(@files, $val) if -f $_;
-    } elsif ($type eq "DIRECTORY") {
+      push(@files, $val) if -f $_; 
+   } elsif ($type eq "DIRECTORY") {
       push(@files, $val) if -d $_;
     } else {
       die "Unknown type requested: $type";
@@ -52,19 +51,17 @@ sub FindAndSortOutput {
 
   find({ wanted => $buildList, no_chdir => 1},  $dir);
 
-  open(FILE_OUTPUT, ">$output") or
-    die "$0: unable to open temporary output file, $output: $!";
-
   my @sortedChompedFiles;
   foreach my $file (sort {$a cmp $b } @files) {
     chomp $file;
     next if defined $ignoreRegex and $file =~ /$ignoreRegex/;
     push(@sortedChompedFiles, $file);
-    print FILE_OUTPUT "$file\n";
+    $outputFH->print("$file\n");
   }
-  close FILE_OUTPUT;
-  die "unable to write to output file: $output: $! ($?)"
-    if $? != 0 and defined $output;
+  $? = 0;
+  $outputFH->close();
+  die "unable to write to output file: $outputFH: $! ($?)"
+    if $? != 0 and defined $outputFH;
 
   return @sortedChompedFiles;
 }
@@ -112,17 +109,19 @@ my($origDir, $comparedDir, $diffOutputFile, $ignoreRegex) = @ARGV;
 $origDir =~ s%/\s*$%%;
 $comparedDir =~ s%/\s*$%%;
 
-my $origTempFile = POSIX::tmpnam();
-my $comparedTempFile = POSIX::tmpnam();
+my $origTempFH = File::Temp->new(UNLINK => 0, SUFFIX => '.orig');
+my $origTempFile = $origTempFH->filename;
+my $comparedTempFH = File::Temp->new(UNLINK => 0, SUFFIX => '.compared');
+my $comparedTempFile = $comparedTempFH->filename;
 
 # First, look for directory differences
 
 print "Doing directory comparison: ";
 
-my(@orgNonRegular) = FindAndSortOutput("NON-REGULAR", $origDir, $origTempFile,
+my(@orgNonRegular) = FindAndSortOutput("NON-REGULAR", $origDir, $origTempFH,
                                  $ignoreRegex, "^/?($origDir|$comparedDir)/?");
 my(@comparedNonRegular) = FindAndSortOutput("NON-REGULAR", $comparedDir,
-                                      $comparedTempFile, $ignoreRegex,
+                                      $comparedTempFH, $ignoreRegex,
                                             "^/?($origDir|$comparedDir)/?");
 
 # TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
@@ -147,10 +146,15 @@ if ($diffExitCode == 2) {
 
 print "Doing file hierarchy comparison: ";
 
-my(@orgFiles) = FindAndSortOutput("FILES", $origDir, $origTempFile,
+$origTempFH = File::Temp->new(UNLINK => 0, SUFFIX => '.orig');
+$origTempFile = $origTempFH->filename;
+$comparedTempFH = File::Temp->new(UNLINK => 0, SUFFIX => '.compared');
+$comparedTempFile = $comparedTempFH->filename;
+
+my(@orgFiles) = FindAndSortOutput("FILES", $origDir, $origTempFH,
                                  $ignoreRegex, "^/?($origDir|$comparedDir)/?");
 my(@comparedFiles) = FindAndSortOutput("FILES", $comparedDir,
-                                       $comparedTempFile, $ignoreRegex, "^/?($origDir|$comparedDir)/?");
+                                       $comparedTempFH, $ignoreRegex, "^/?($origDir|$comparedDir)/?");
 
 # TODO: use the right Perl mechanism instead of /bin/echo (ossguy)
 system("/bin/echo >> $diffOutputFile 2>&1");
