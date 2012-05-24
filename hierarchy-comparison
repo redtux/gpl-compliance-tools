@@ -221,7 +221,7 @@ if ($DO_DIFF) {
   foreach my $file (sort(keys %final)) {
     if ($origFiles2sha1->{$file} ne $comparedFiles2sha1->{$file}) {
       system(
-             "/usr/bin/diff -u \"$origDir/$file\" \"$comparedDir/$file\" >> $diffOutputFile 2>&1");
+             "/usr/bin/diff -wu \"$origDir/$file\" \"$comparedDir/$file\" >> $diffOutputFile 2>&1");
     }
   }
 }
