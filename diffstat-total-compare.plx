@@ -46,14 +46,14 @@ for my $file (<*.diffstat>) {
   my %commit;
   open(DIFFSTAT, "<", $file) or die "unable to open $file for reading: $!";
   while (my $line = <DIFFSTAT>) {
-    if ($line =~ /^\s*(\d+)files\s+changed\s*,\s+(\d+)insertions[^\d]+\s+(\d+) deletions.*$/) {
+    if ($line =~ /^\s*(\d+)\s*files\s+changed\s*,\s*(\d+)\s*insertion[^\d]+\s+(\d+)\s*deletion.*$/) {
       ($commit{files}, $commit{insertions}, $commit{deletions}) = ($1, $2, $3);
       last;
     }
-    die "unable to find diffstat summary line in $file"
-      unless defined $commit{files} and defined $commit{insertions} 
-        and defined $commit{deletions};
   }
+  die "unable to find diffstat summary line in $file"
+    unless defined $commit{files} and defined $commit{insertions} 
+      and defined $commit{deletions};
   close DIFFSTAT;    die "error reading $file: $!" unless ($? == 0);
   $commitTotals{$commitID} = \%commit;
 }
