@@ -55,10 +55,11 @@ for my $file (<*.diffstat>) {
     unless defined $commit{files} and defined $commit{insertions} 
       and defined $commit{deletions};
   close DIFFSTAT;    die "error reading $file: $!" unless ($? == 0);
+  $commit{totalLines} = $commit{insertions} + $commit{deletions};
   $commitTotals{$commitID} = \%commit;
 }
 
-foreach my $type (qw/files insertions deletions/) {
+foreach my $type (qw/files insertions deletions totalLines/) {
   print "Sorted by $type:\n";
   foreach my $commitID (
         sort { $commitTotals{$a}{$type} <=> $commitTotals{$b}{$type} }
