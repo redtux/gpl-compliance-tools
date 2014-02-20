@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # hierarchy-comparison                                            -*- Perl -*-
 #   Possible bug: only -type f and -type d are checked
-# Copyright (C) 2001, 2002, 2003, 2004, 2008, 2011, 2012 Bradley M. Kuhn <bkuhn@ebb.org>
+# Copyright (C) 2001, 2002, 2003, 2004, 2008, 2011, 2012, 2014 Bradley M. Kuhn <bkuhn@ebb.org>
 # Copyright (C) 2011 Denver Gingerich <denver@ossguy.com>
 #
 # This software's license gives you freedom; you can copy, convey,
