@@ -116,6 +116,12 @@ my $comparedTempFile = $comparedTempFH->filename;
 
 # First, look for directory differences
 
+print "Comparing $origDir to $comparedDir";
+if (defined $ignoreRegex and $ignoreRegex !~ /^\s*$/) {
+  print ", excluding excluding all files matching this RE: $ignoreRegex\n";
+} else {
+  print "\n";
+}
 print "Doing directory comparison: ";
 
 my(@orgNonRegular) = FindAndSortOutput("NON-REGULAR", $origDir, $origTempFH,
