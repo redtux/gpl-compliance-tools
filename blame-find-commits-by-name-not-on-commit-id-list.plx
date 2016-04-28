@@ -28,7 +28,7 @@ my $VERBOSE = 0;
 
 
 if (@ARGV != 3) {
-  print "usage: $0 <BLAME_DATA_FILE> ", "<NAME_REGEX> <BOUNDING_COMMIT_ID_LIST_FILE>\n";
+  print "usage: $0 <BLAME_DATA_FILE> ", "<NAME_REGEX> <KNOWN_COMMIT_ID_LIST_FILE>\n";
   exit 1;
 }
 # Note: $BLAME_DATA_FILE is in the format as output from:
@@ -36,19 +36,19 @@ if (@ARGV != 3) {
 #      echo "FILE: $i" >> ../DATA_FILE; git blame  -M -M -M -C -C -C -w -f -n -l $i >> ../DATA_FILE
 #      done
 
-my($BLAME_DATA_FILE, $NAME_REGEX, $BOUNDING_COMMIT_ID_LIST_FILE) = @ARGV;
+my($BLAME_DATA_FILE, $NAME_REGEX, $KNOWN_COMMIT_ID_LIST_FILE) = @ARGV;
 
-open(BOUNDING_COMMIT_IDS, "<", $BOUNDING_COMMIT_ID_LIST_FILE) or die "unable to open $BOUNDING_COMMIT_ID_LIST_FILE: $!";
+open(KNOWN_COMMIT_IDS, "<", $KNOWN_COMMIT_ID_LIST_FILE) or die "unable to open $KNOWN_COMMIT_ID_LIST_FILE: $!";
 
-my %boundingCommitIDs;
+my %knownCommitIDs;
 
-while (my $commitLine = <BOUNDING_COMMIT_IDS>) {
-  die "invalid line in $BOUNDING_COMMIT_ID_LIST_FILE: $commitLine"
+while (my $commitLine = <KNOWN_COMMIT_IDS>) {
+  die "invalid line in $KNOWN_COMMIT_ID_LIST_FILE: $commitLine"
     unless $commitLine =~ /^\s*(\S+)\s*$/;
-  $boundingCommitIDs{$1} = $BOUNDING_COMMIT_ID_LIST_FILE;
+  $knownCommitIDs{$1} = $KNOWN_COMMIT_ID_LIST_FILE;
 }
-close BOUNDING_COMMIT_IDS;
-die "error($?) closing $BOUNDING_COMMIT_ID_LIST_FILE: $!" unless $? == 0;
+close KNOWN_COMMIT_IDS;
+die "error($?) closing $KNOWN_COMMIT_ID_LIST_FILE: $!" unless $? == 0;
 
 open(DATA_FILE, "<", $BLAME_DATA_FILE) or die "unable to open $BLAME_DATA_FILE for reading: $!";
 
@@ -56,7 +56,9 @@ my %commitsMatchingRegex;
 my $currentFile;
 my $overalTotalLines = 0;
 
-print "LINES FOUND IN $BLAME_DATA_FILE that are on $BOUNDING_COMMIT_ID_LIST_FILE: and match $NAME_REGEX:\n" if $VERBOSE;
+my %missingCommits;
+
+print "LINES FOUND IN $BLAME_DATA_FILE that are on $KNOWN_COMMIT_ID_LIST_FILE: and match $NAME_REGEX:\n" if $VERBOSE;
 while (my $dataLine = <DATA_FILE>) {
   if ($dataLine =~ /^\s*FILE\s*:\s*(.*?)\s*$/) {
     $currentFile = $1;
@@ -66,26 +68,19 @@ while (my $dataLine = <DATA_FILE>) {
     my($commitID, $name, $date, $tz, $curLineNumber, $actualCurrentLine) = ($1, $2, $3, $4, $5, $6);
     next if $currentFile =~ /ChangeLog/i;  # Ignore the changelog, as that may just be a dump
                                            # from the revision history.
-    if ($name =~ /$NAME_REGEX/i and defined $boundingCommitIDs{$commitID}) {
-      $commitsMatchingRegex{$commitID} = { __totalLines => 0, __VERBOSE_LINE_OUTPUT => "" } unless defined $commitsMatchingRegex{$commitID};
-      $commitsMatchingRegex{$commitID}{$currentFile} = 0 unless defined $commitsMatchingRegex{$commitID}{$currentFile};
-      $commitsMatchingRegex{$commitID}{$currentFile}++;
-      $commitsMatchingRegex{$commitID}{__totalLines}++;
-      $commitsMatchingRegex{$commitID}{__VERBOSE_LINE_OUTPUT} .= $dataLine;
-      print "      $dataLine" if $VERBOSE;
-      $overalTotalLines++;
+    if ($name =~ /$NAME_REGEX/i and not defined $knownCommitIDs{$commitID}) {
+      $missingCommits{$commitID} = $currentFile;
     }
   }
 }
 close DATA_FILE;
 
-print "Total patches by author(s) matching $NAME_REGEX in $BLAME_DATA_FILE and found in $BOUNDING_COMMIT_ID_LIST_FILE:\n",
-  "            ", scalar(keys %commitsMatchingRegex), "\n";
-print "Total lines by author(s) matching $NAME_REGEX in $BLAME_DATA_FILE and found in $BOUNDING_COMMIT_ID_LIST_FILE:\n",
-  "            ", $overalTotalLines, "\n";
+foreach my $commitId (sort keys %missingCommits) {
+  print $commitId, "\n";
+}
 
 
 #
 # Local variables:
-# compile-command: "perl -c blame-count-lines-by-name-and-commit-list.plx"
+# compile-command: "perl -c blame-find-commits-by-name-not-on-commit-id-list.plx"
 # End:
