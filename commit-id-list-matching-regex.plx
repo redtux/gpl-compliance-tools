@@ -43,3 +43,7 @@ while ( my $gitLog = $logIterator->next() ) {
   print ref $gitLog, "\n";
 }
 
+#
+# Local variables:
+# compile-command: "perl -c commit-id-list-matching-regex.plx"
+# End:
