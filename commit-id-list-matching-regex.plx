@@ -46,8 +46,8 @@ while ( my $gitLog = $logIterator->next() ) {
   if ($author =~ /$AUTHOR_NAME_REGEX/im or (defined $LOG_MESSAGE_REGEX and $message =~ /$LOG_MESSAGE_REGEX/im)) {
     print STDERR "Including: ", $gitLog->commit(), "\n", "Author: $author", "\n\n", $message,  "#" x 72, "\n"
       if $VERBOSE;
+    print $gitLog->commit(), "\n";
   }
-  print $gitLog->commit(), "\n";
 }
 
 #
