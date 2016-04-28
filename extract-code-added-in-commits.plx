@@ -70,3 +70,10 @@
 
 # In other words, this process measures only quantity of code written and
 # fails to examine the quality of the code.
+
+
+
+#
+# Local variables:
+# compile-command: "perl -c extract-code-added-in-commits.plx"
+# End:
