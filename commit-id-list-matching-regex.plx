@@ -30,17 +30,24 @@
 
 use Git::Repository 'Log';
 
-if (@ARGV != 2) {
-  print "usage: $0 <GIT_REPOSITORY_PATH> ", "<NAME_REGEX>\n";
+if (@ARGV != 3 and @ARGV != 2 and @ARGV != 4) {
+  print "usage: $0 <GIT_REPOSITORY_PATH> ", "<AUTHOR_NAME_REGEX> [<LOG_MESSAGE_REGEX>] [<VERBOSE_LEVEL>]\n";
   exit 1;
 }
-my($GIT_REPOSITORY_PATH, $NAME_REGEX) = @ARGV;
+my($GIT_REPOSITORY_PATH, $AUTHOR_NAME_REGEX, $LOG_MESSAGE_REGEX, $VERBOSE) = @ARGV;
+$VERBOSE = 0 if not defined $VERBOSE;
 
 my $gitRepository = Git::Repository->new(git_dir => $GIT_REPOSITORY_PATH);
 
 my $logIterator = $gitRepository->log();
 while ( my $gitLog = $logIterator->next() ) {
-  print ref $gitLog, "\n";
+  my $author = $gitLog->author();
+  my $message = $gitLog->message();
+  if ($author =~ /$AUTHOR_NAME_REGEX/im or (defined $LOG_MESSAGE_REGEX and $message =~ /$LOG_MESSAGE_REGEX/im)) {
+    print STDERR "Including: ", $gitLog->commit(), "\n", "Author: $author", "\n\n", $message,  "#" x 72, "\n"
+      if $VERBOSE;
+  }
+  print $gitLog->commit(), "\n";
 }
 
 #
