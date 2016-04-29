@@ -100,7 +100,7 @@ sub ProcessCommit($$) {
   print LOG "Started $commitId in $pid at $now\n";
   sleep 5;
   $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-  print "Finished $commitId in $pid at $now\n";
+  print LOG "Finished $commitId in $pid at $now\n";
   close LOG;
 }
 ##############################################################################
