@@ -124,6 +124,9 @@ make_path($LOG_DIR, {mode => 0750});
 die "The directory, $OUTPUT_DIRECTORY, must be a writeable directory" unless -d $OUTPUT_DIRECTORY and -w $OUTPUT_DIRECTORY;
 die "The log directory, $LOG_DIR, must be a writeable directory" unless -d $LOG_DIR and -w $LOG_DIR;
 
+##############################################################################
+# Read STDIN for whitelist commits
+
 my %WHITELIST_COMMIT_IDS;
 
 # Snarf in data
