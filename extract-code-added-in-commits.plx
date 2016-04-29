@@ -141,7 +141,7 @@ while (my $line = <STDIN>) {
 # Set up child processing and signal commits.
 
 my %childProcesses;
-my %finishedCommits;
+my %finishedOperations;
 
 $SIG{CHLD} = sub {
   # don't change $! and $? outside handler
@@ -150,12 +150,27 @@ $SIG{CHLD} = sub {
     my($errCode, $errString) = ($?, $!);
     my $commitId = $childProcesses{$pid};
     my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($errCode, \"$errString\") at $now\n" if $VERBOSE;
-    $finishedCommits{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
+    print STDERR "Finished operation $commitId in $pid ($errCode, \"$errString\") at $now\n" if $VERBOSE;
+    $finishedOperations{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
     delete $childProcesses{$pid};
   }
 };
-
+##############################################################################
+sub StartChildLog($$) {
+  my($operation, $pid) = @_;
+  my $logFile = File::Spec->catfile($LOG_DIR, "${operation}.${pid}.log");
+  open(my $fh, ">", $logFile);
+  my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+  print $fh "Started $operation in $pid at $now\n";
+  return $fh;
+}
+##############################################################################
+sub EndChildLog($$$) {
+  my($fh, $operation, $pid) = @_;
+  my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+  print $fh "Finished $operation in $pid at $now\n";
+  close $fh;
+}
 ##############################################################################
 # ProcessCommit is the primary function that processes a commit to generate
 # the blame data.  If $fileListRef is defined, it should be a list reference,
@@ -164,14 +179,9 @@ $SIG{CHLD} = sub {
 
 sub ProcessCommit($$;$) {
   my($commitId, $pid, $fileListRef) = @_;
-  my $logFile = File::Spec->catfile($LOG_DIR, "${commitId}.${pid}.log");
-  open(LOG, ">", $logFile);
-  my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-  print LOG "Started $commitId in $pid at $now\n";
+  my $fh = StartChildLog($commitId, $pid);
   sleep 5;
-  $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-  print LOG "Finished $commitId in $pid at $now\n";
-  close LOG;
+  EndChildLog($fh, $commitId, $pid);
 }
 ##############################################################################
 sub GitBlameDataToFile($$) {
@@ -268,15 +278,15 @@ while (scalar(keys %childProcesses) >  0) {
 }
 
 my $startCnt = scalar(keys %WHITELIST_COMMIT_IDS);
-my $doneCnt = scalar(keys %finishedCommits);
+my $doneCnt = scalar(keys %finishedOperations);
 print STDERR "ERROR: all children completed but ", $doneCnt - $startCnt, " not completed\n";
 
-foreach my $commitId (keys %finishedCommits) {
-  print STDERR "Completed $commitId at $finishedCommits{$commitId}{time} in $finishedCommits{$commitId}{pid}\n" if $VERBOSE;
-  print STDERR "ERROR: $commitId had non-zero  exit status of $finishedCommits{$commitId}{errCode} ",
-    "with message \"$finishedCommits{$commitId}{errString}\"",
-    " at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n"
-    unless $finishedCommits{$commitId}{errCode} == 0;
+foreach my $commitId (keys %finishedOperations) {
+  print STDERR "Completed $commitId at $finishedOperations{$commitId}{time} in $finishedOperations{$commitId}{pid}\n" if $VERBOSE;
+  print STDERR "ERROR: $commitId had non-zero  exit status of $finishedOperations{$commitId}{errCode} ",
+    "with message \"$finishedOperations{$commitId}{errString}\"",
+    " at $finishedOperations{$commitId}{now} in $finishedOperations{$commitId}{pid}\n"
+    unless $finishedOperations{$commitId}{errCode} == 0;
 }
 ###############################################################################
 #
