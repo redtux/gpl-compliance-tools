@@ -152,10 +152,29 @@ sub ProcessCommit($$;$) {
   close LOG;
 }
 ##############################################################################
+sub GitBlameDataToFile($$) {
+  my($filename, $dataListRef) = @_;
+  print STDERR "Writing git blame data to $filename\n" if $VERBOSE >= 6;
+
+  open(SPARSE_FILE, ">", $filename) or die "Unable to open $filename: $!";
+
+  foreach my $line (@$dataListRef) {
+    die "invalid line: $line in blame output" unless ($line =~
+      /^\s*(\S+)\s+\S+\s+\d+\s+\((.+)\s+(\d{4,4}\-\d{2,2}\-\d{2,2}\s+\d{2,2}:\d{2,2}:\d{2,2})\s+([\+\-\d]+)\s+(\d+)\s*\)\s+(.*)$/);
+    my($commitID, $name, $date, $tz, $curLineNumber, $actualCurrentLine) = ($1, $2, $3, $4, $5, $6);
+    if (defined $WHITELIST_COMMIT_IDS{$commitID}) {
+      print SPARSE_FILE "$actualCurrentLine\n";
+    } else {
+      print SPARSE_FILE "\n";
+    }
+  }
+  close SPARSE_FILE;
+}
+##############################################################################
 sub RunCentralCommitMode($) {
   my($centralCommitId) = @_;
 
-  my $centralOutputDir = File::Spec($OUTPUT_DIRECTORY, $centralCommitId);
+  my $centralOutputDir = File::Spec->catfile($OUTPUT_DIRECTORY, $centralCommitId);
   make_path($centralOutputDir, {mode => 0750});
 
   print "Creating Repository object with args $GIT_REPOSITORY_PATH\n" if ($VERBOSE >= 6);
@@ -170,11 +189,22 @@ sub RunCentralCommitMode($) {
   }
   foreach my $file (keys %files) {
     my($vv, $path, $filename) = File::Spec->splitpath($file);
-    $path = File::Spec($centralOutputDir, $path);
+    $path = File::Spec->catfile($centralOutputDir, $path);
     make_path($path, 0750);
-    my(@blameData) = $gitRepository->run('blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS,
-                                         $centralCommitId, '--', $file);
-    GitBlameDataToFile(File::Spec($path, $filename), \@blameData);
+    my(@blameData);
+    eval {
+      @blameData = $gitRepository->run('blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS,
+                                           $centralCommitId, '--', $file);
+    };
+    my $err = $@;
+    if (defined $err and $err =~ /fatal.*no\s+such\s+path/) {
+      # ignore this file; it isn't present anymore in the central commit.
+    } elsif (defined $err and $err !~ /^\s*$/) {
+      die "unrecoverable git blame error: $err";
+    } else {
+      my $f = File::Spec->catfile($path, $filename);
+      GitBlameDataToFile($f, \@blameData);
+    }
   }
 }
 ##############################################################################
