@@ -38,6 +38,15 @@
 #   the full corpus requires building but in some cases, where code has been
 #   rewritten.
 
+# That is the "comprehensive mode" of this script.  There is also the
+# "central commit" mode.  In the central commit mode, to speed up, *one*
+# specific commit is favored for the blame data gathering.
+
+# Ultimately, this is input to a process that will compare the output to
+# another codebase to see if material from these commits appear in the other
+# codebase.  Use the comprehensive mode if you don't know when the other
+# codebase forked from the one studied here, and use the "central commit"
+# mode if you're already sure where they forked.
 
 # Clear Flaw in this process:
 
