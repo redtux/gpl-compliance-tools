@@ -124,31 +124,38 @@ $SIG{CHLD} = sub {
     my($errCode, $errString) = ($?, $!);
     my $commitId = $childProcesses{$pid};
     my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($!, $?) at $now\n" if $VERBOSE;
+    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($errCode, \"$errString\") at $now\n" if $VERBOSE;
     $finishedCommits{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
     delete $childProcesses{$pid};
   }
 };
 
 foreach my $commitId (@unfinishedCommitIds) {
-  while (scalar(keys %childProcesses) >=  $FORK_LIMIT) {
-    print STDERR "Sleep a bit while children going for ", join(", ", sort values %childProcesses), "\n" if $VERBOSE;
+  my $remainingCount = scalar(keys %childProcesses);
+  while ($remainingCount >=  $FORK_LIMIT) {
+    print STDERR "Sleep a bit while $remainingCount children going for these commits ",
+      join(", ", sort values %childProcesses), "\n" if $VERBOSE;
     sleep 10;
+    $remainingCount = scalar(keys %childProcesses);
   }
   my $forkCount = scalar(keys %childProcesses)  + 1;
   my $pid = fork();
   die "cannot fork: $!" unless defined $pid;
-  if ($pid == 0) {
-    print STDERR "Launched $forkCount child to handle $commitId\n" if $VERBOSE;
+  if ($pid == 0) {   # The new child process is here
+    $0 = "$commitId git blame subprocess";
+    ProcessCommit($commitId, $$);
     exit 0;
-  } else {
+  } else {   # The parent is here
+    print STDERR "Launched $forkCount child to handle $commitId\n" if $VERBOSE;
     $childProcesses{$pid} = $commitId;
-    ProcessCommit($commitId, $pid);
   }
 }
 
-while (scalar(keys %childProcesses) >=  0) {
-  print STDERR "Sleep a bit while children going for ", join(", ", sort values %childProcesses), "\n" if $VERBOSE;
+while (scalar(keys %childProcesses) >  0) {
+  if ($VERBOSE) {
+    print STDERR "Sleep a bit because these are still running ";
+    foreach my $pid (keys %childProcesses) { print STDERR "   $pid for $childProcesses{$pid}\n"; }
+  }
   sleep 10;
 }
 
