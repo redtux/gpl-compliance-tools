@@ -143,7 +143,7 @@ while (my $line = <STDIN>) {
 my %childProcesses;
 my %finishedOperations;
 
-my $childHandler = sub {
+my $HANDLE_BLAME_WORKERS_SUB = sub {
   # don't change $! and $? outside handler
   local ($!, $?);
   while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
@@ -155,7 +155,6 @@ my $childHandler = sub {
     delete $childProcesses{$pid};
   }
 };
-# $SIG{CHLD} = $childHandler;
 ##############################################################################
 sub StartChildLog($$) {
   my($operation, $pid) = @_;
@@ -220,23 +219,46 @@ sub RunCentralCommitMode($) {
       $files{$file} = $commitId if not defined $files{$file};
     }
   }
+  $SIG{CHLD} = $HANDLE_BLAME_WORKERS_SUB;
   foreach my $file (keys %files) {
     my($vv, $path, $filename) = File::Spec->splitpath($file);
     $path = File::Spec->catfile($centralOutputDir, $path);
     make_path($path, 0750);
-    my(@blameData);
-    eval {
-      @blameData = $gitRepository->run('blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS,
-                                           $centralCommitId, '--', $file);
-    };
-    my $err = $@;
-    if (defined $err and $err =~ /fatal.*no\s+such\s+path/) {
-      # ignore this file; it isn't present anymore in the central commit.
-    } elsif (defined $err and $err !~ /^\s*$/) {
-      die "unrecoverable git blame error: $err";
-    } else {
-      my $f = File::Spec->catfile($path, $filename);
-      GitBlameDataToFile($f, \@blameData);
+    my $remainingCount = scalar(keys %childProcesses);
+    while ($remainingCount >=  $FORK_LIMIT) {
+      print STDERR "Sleep a bit while $remainingCount children going for these commits ",
+        join(", ", sort values %childProcesses), "\n" if $VERBOSE;
+      sleep 10;
+      $remainingCount = scalar(keys %childProcesses);
+    }
+    my $forkCount = scalar(keys %childProcesses)  + 1;
+    my $pid = fork();
+    die "cannot fork: $!" unless defined $pid;
+    if ($pid == 0) {   # The new child process is here
+      $SIG{CHLD} = 'DEFAULT';
+      my $logFH = StartChildLog($filename, $$);
+      $0 = "$path/$filename git blame subprocess";
+      my(@blameData);
+      print $logFH "running: git",
+        'blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS, $centralCommitId, '--', $file, "\n";
+      eval {
+        @blameData = $gitRepository->run('blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS,
+                                         $centralCommitId, '--', $file);
+      };
+      my $err = $@;
+      if (defined $err and $err =~ /fatal.*no\s+such\s+path/) {
+        # ignore this file; it isn't present anymore in the central commit.
+      } elsif (defined $err and $err !~ /^\s*$/) {
+        print $logFH "unrecoverable git blame error: $err";
+      } else {
+        my $f = File::Spec->catfile($path, $filename);
+        GitBlameDataToFile($f, \@blameData);
+      }
+      EndChildLog($logFH, $filename, $$);
+      exit 0;
+    } else {   # The parent is here
+      $childProcesses{$pid} = $file;
+      print STDERR "Launched $forkCount child to handle $filename\n" if $VERBOSE;
     }
   }
 }
