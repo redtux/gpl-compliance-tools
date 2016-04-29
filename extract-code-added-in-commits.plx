@@ -80,6 +80,9 @@
 # In other words, this process measures only quantity of code written and
 # fails to examine the quality of the code.
 
+use strict;
+use warnings;
+
 use Git::Repository 'Log';
 use POSIX ":sys_wait_h";
 use File::Spec;
