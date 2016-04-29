@@ -138,6 +138,25 @@ while (my $line = <STDIN>) {
 }
 
 ##############################################################################
+# Set up child processing and signal commits.
+
+my %childProcesses;
+my %finishedCommits;
+
+$SIG{CHLD} = sub {
+  # don't change $! and $? outside handler
+  local ($!, $?);
+  while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+    my($errCode, $errString) = ($?, $!);
+    my $commitId = $childProcesses{$pid};
+    my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($errCode, \"$errString\") at $now\n" if $VERBOSE;
+    $finishedCommits{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
+    delete $childProcesses{$pid};
+  }
+};
+
+##############################################################################
 # ProcessCommit is the primary function that processes a commit to generate
 # the blame data.  If $fileListRef is defined, it should be a list reference,
 # where the list contains a list of pathnames to run git blame on.  If it is
@@ -218,22 +237,6 @@ if (defined $CENTRAL_COMMIT) {
 }
 
 exit 0;
-
-my %childProcesses;
-my %finishedCommits;
-
-$SIG{CHLD} = sub {
-  # don't change $! and $? outside handler
-  local ($!, $?);
-  while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
-    my($errCode, $errString) = ($?, $!);
-    my $commitId = $childProcesses{$pid};
-    my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
-    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($errCode, \"$errString\") at $now\n" if $VERBOSE;
-    $finishedCommits{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
-    delete $childProcesses{$pid};
-  }
-};
 
 foreach my $commitId (keys %WHITELIST_COMMIT_IDS) {
   my $remainingCount = scalar(keys %childProcesses);
