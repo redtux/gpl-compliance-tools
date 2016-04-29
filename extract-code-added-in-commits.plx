@@ -143,7 +143,7 @@ while (my $line = <STDIN>) {
 my %childProcesses;
 my %finishedOperations;
 
-$SIG{CHLD} = sub {
+my $childHandler = sub {
   # don't change $! and $? outside handler
   local ($!, $?);
   while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
@@ -155,6 +155,7 @@ $SIG{CHLD} = sub {
     delete $childProcesses{$pid};
   }
 };
+# $SIG{CHLD} = $childHandler;
 ##############################################################################
 sub StartChildLog($$) {
   my($operation, $pid) = @_;
