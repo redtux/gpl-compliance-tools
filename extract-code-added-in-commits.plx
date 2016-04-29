@@ -150,11 +150,15 @@ sub ProcessCommit($$;$) {
 sub RunCentralCommitMode($) {
   my($centralCommitId) = @_;
 
+  print "Creating Repository object with args $GIT_REPOSITORY_PATH\n" if ($VERBOSE >= 6);
   my $gitRepository = Git::Repository->new(git_dir => $GIT_REPOSITORY_PATH);
 
+  my %files;
   foreach my $commitId (keys %WHITELIST_COMMIT_IDS) {
-    my(@commitFiles) = $gitRepository->run('show', '--pretty="format:"', '--name-only');
-    print join("\n", @commitFiles);
+    my(@commitFiles) = $gitRepository->run('show', '--pretty=format:', '--name-only', $commitId);
+    foreach my $file (@commitFiles) {
+      $files{$file} = $commitId if not defined $files{$file};
+    }
   }
 }
 
