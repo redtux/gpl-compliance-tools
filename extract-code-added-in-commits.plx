@@ -92,19 +92,21 @@ use POSIX qw(strftime);
 use Getopt::Long;
 use Pod::Usage;
 
-my($GIT_REPOSITORY_PATH, $OUTPUT_DIRECTORY, $CENTRAL_COMMIT, $FORK_LIMIT, $VERBOSE);
+my($GIT_REPOSITORY_PATH, $OUTPUT_DIRECTORY, $CENTRAL_COMMIT, $FORK_LIMIT, $VERBOSE, @ADDITIONAL_BLAME_OPTS);
 $VERBOSE = 0;
 $FORK_LIMIT = 1;
 
 my $usage = "usage: $0  --repository=PATH --output-dir=DIR  [--central-commit=COMMIT-ID] [--fork-limit=NUMBER [--verbose[=LEVEL]]\n";
 unless (GetOptions("repository=s" => \$GIT_REPOSITORY_PATH,
                    "output-dir=s" => \$OUTPUT_DIRECTORY,
-           "verbose:+" => \$VERBOSE,
+                   "verbose:+" => \$VERBOSE,
+                   "--blame-opts=s" => \@ADDITIONAL_BLAME_OPTS,
            "central-commit:s" => \$CENTRAL_COMMIT,
                    "fork-limit:i" => \$FORK_LIMIT)) {
   print STDERR $usage;
   exit 1;
 }
+
 if (not defined $GIT_REPOSITORY_PATH) {
   print STDERR "--repository is a required command line argument.\n";
   print STDERR $usage;
