@@ -133,7 +133,7 @@ while (my $line = <STDIN>) {
   die "badly formatted commit ID: $line" unless $line =~ /^[a-z0-9]{40,40}$/;
   $WHITELIST_COMMIT_IDS{$line} = $line;
 }
-close STDIN;
+
 ##############################################################################
 # ProcessCommit is the primary function that processes a commit to generate
 # the blame data.  If $fileListRef is defined, it should be a list reference,
