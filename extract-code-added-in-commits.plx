@@ -71,7 +71,102 @@
 # In other words, this process measures only quantity of code written and
 # fails to examine the quality of the code.
 
+use Git::Repository 'Log';
+use POSIX ":sys_wait_h";
+use File::Spec;
+use File::Path qw(make_path remove_tree);
+use autodie qw(:all);
+use POSIX qw(strftime);
 
+if (@ARGV != 2 and @ARGV != 3 and @ARGV != 4) {
+  print "usage: $0 <GIT_REPOSITORY_PATH> ", "<OUTPUT_DIRECTORY> [<FORK_LIMIT>] [<VERBOSE_LEVEL>]\n";
+  exit 1;
+}
+my($GIT_REPOSITORY_PATH, $OUTPUT_DIRECTORY, $FORK_LIMIT, $VERBOSE) = @ARGV;
+$VERBOSE = 0 if not defined $VERBOSE;
+$FORK_LIMIT = 1 if not defined $FORK_LIMIT;
+
+my $LOG_DIR = File::Spec->catfile($OUTPUT_DIRECTORY, ".logs");
+remove_tree($LOG_DIR) if -d $LOG_DIR;
+make_path($LOG_DIR, {mode => 0750});
+die "The directory, $OUTPUT_DIRECTORY, must be a writeable directory" unless -d $OUTPUT_DIRECTORY and -w $OUTPUT_DIRECTORY;
+die "The log directory, $LOG_DIR, must be a writeable directory" unless -d $LOG_DIR and -w $LOG_DIR;
+##############################################################################
+sub ProcessCommit($$) {
+  my($commitId, $pid) = @_;
+  my $logFile = File::Spec->catfile($LOG_DIR, "${commitId}.${pid}.log");
+  open(LOG, ">", $logFile);
+  my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+  print LOG "Started $commitId in $pid at $now\n";
+  sleep 5;
+  $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+  print "Finished $commitId in $pid at $now\n";
+  close LOG;
+}
+##############################################################################
+# Mainline of script
+
+my @unfinishedCommitIds;
+
+while (my $line = <STDIN>) {
+  chomp $line;
+  die "badly formatted commit ID: $line" unless $line =~ /^[a-z0-9]{40,40}$/;
+  push(@unfinishedCommitIds, $line);
+}
+
+my %childProcesses;
+my %finishedCommits;
+
+$SIG{CHLD} = sub {
+  # don't change $! and $? outside handler
+  local ($!, $?);
+  while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+    my($errCode, $errString) = ($?, $!);
+    my $commitId = $childProcesses{$pid};
+    my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
+    print STDERR "Finished commit $commitId $childProcesses{$pid} in $pid ($!, $?) at $now\n" if $VERBOSE;
+    $finishedCommits{$commitId} = { pid => $pid, time => $now, errCode => $errCode, errString => $errString };
+    delete $childProcesses{$pid};
+  }
+};
+
+foreach my $commitId (@unfinishedCommitIds) {
+  while (scalar(keys %childProcesses) >=  $FORK_LIMIT) {
+    print STDERR "Sleep a bit while children going for ", join(", ", sort values %childProcesses), "\n" if $VERBOSE;
+    sleep 10;
+  }
+  my $forkCount = scalar(keys %childProcesses)  + 1;
+  my $pid = fork();
+  die "cannot fork: $!" unless defined $pid;
+  if ($pid == 0) {
+    print STDERR "Launched $forkCount child to handle $commitId\n" if $VERBOSE;
+    exit 0;
+  } else {
+    $childProcesses{$pid} = $commitId;
+    ProcessCommit($commitId, $pid);
+  }
+}
+
+while (scalar(keys %childProcesses) >=  0) {
+  print STDERR "Sleep a bit while children going for ", join(", ", sort values %childProcesses), "\n" if $VERBOSE;
+  sleep 10;
+}
+
+my $startCnt = scalar(@unfinishedCommitIds);
+my $doneCnt = scalar(keys %finishedCommits);
+print STDERR "ERROR: all children completed but ", $doneCnt - $startCnt, " not completed\n";
+
+foreach my $commitId (keys %finishedCommits) {
+  print STDERR "Completed $commitId at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n" if $VERBOSE;
+  print STDERR "ERROR: $commitId had non-zero  exit status of $finishedCommits{$commitId}{errCode} ",
+    "with message \"$finishedCommits{$commitId}{errString}\"",
+    " at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n"
+    unless $finishedCommits{$commitId}{errCode} == 0;
+}
+
+
+# git show --pretty="format:" --name-only
+# git blame  -M -M -M -C -C -C -w -f -n -l
 
 #
 # Local variables:
