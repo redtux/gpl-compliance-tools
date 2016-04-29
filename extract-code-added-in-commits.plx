@@ -155,6 +155,9 @@ sub ProcessCommit($$;$) {
 sub RunCentralCommitMode($) {
   my($centralCommitId) = @_;
 
+  my $centralOutputDir = File::Spec($OUTPUT_DIRECTORY, $centralCommitId);
+  make_path($centralOutputDir, {mode => 0750});
+
   print "Creating Repository object with args $GIT_REPOSITORY_PATH\n" if ($VERBOSE >= 6);
   my $gitRepository = Git::Repository->new(git_dir => $GIT_REPOSITORY_PATH);
 
@@ -165,8 +168,15 @@ sub RunCentralCommitMode($) {
       $files{$file} = $commitId if not defined $files{$file};
     }
   }
+  foreach my $file (keys %files) {
+    my($vv, $path, $filename) = File::Spec->splitpath($file);
+    $path = File::Spec($centralOutputDir, $path);
+    make_path($path, 0750);
+    my(@blameData) = $gitRepository->run('blame', '-w', '-f', '-n', '-l', @ADDITIONAL_BLAME_OPTS,
+                                         $centralCommitId, '--', $file);
+    GitBlameDataToFile(File::Spec($path, $filename), \@blameData);
+  }
 }
-
 ##############################################################################
 # Main line of script
 
@@ -232,11 +242,7 @@ foreach my $commitId (keys %finishedCommits) {
     " at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n"
     unless $finishedCommits{$commitId}{errCode} == 0;
 }
-
-
-# 
-# git blame  -M -M -M -C -C -C -w -f -n -l
-
+###############################################################################
 #
 # Local variables:
 # compile-command: "perl -c extract-code-added-in-commits.plx"
