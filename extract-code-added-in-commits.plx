@@ -157,7 +157,7 @@ my $doneCnt = scalar(keys %finishedCommits);
 print STDERR "ERROR: all children completed but ", $doneCnt - $startCnt, " not completed\n";
 
 foreach my $commitId (keys %finishedCommits) {
-  print STDERR "Completed $commitId at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n" if $VERBOSE;
+  print STDERR "Completed $commitId at $finishedCommits{$commitId}{time} in $finishedCommits{$commitId}{pid}\n" if $VERBOSE;
   print STDERR "ERROR: $commitId had non-zero  exit status of $finishedCommits{$commitId}{errCode} ",
     "with message \"$finishedCommits{$commitId}{errString}\"",
     " at $finishedCommits{$commitId}{now} in $finishedCommits{$commitId}{pid}\n"
