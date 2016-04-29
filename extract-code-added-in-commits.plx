@@ -77,23 +77,57 @@ use File::Spec;
 use File::Path qw(make_path remove_tree);
 use autodie qw(:all);
 use POSIX qw(strftime);
+use Getopt::Long;
+use Pod::Usage;
 
-if (@ARGV != 2 and @ARGV != 3 and @ARGV != 4) {
-  print "usage: $0 <GIT_REPOSITORY_PATH> ", "<OUTPUT_DIRECTORY> [<FORK_LIMIT>] [<VERBOSE_LEVEL>]\n";
+my($GIT_REPOSITORY_PATH, $OUTPUT_DIRECTORY, $CENTRAL_COMMIT, $FORK_LIMIT, $VERBOSE);
+$VERBOSE = 0;
+$FORK_LIMIT = 1;
+
+my $usage = "usage: $0  --repository=PATH --output-dir=DIR  [--central-commit=COMMIT-ID] [--fork-limit=NUMBER [--verbose[=LEVEL]]\n";
+unless (GetOptions("repository=s" => \$GIT_REPOSITORY_PATH,
+                   "output-dir=s" => \$OUTPUT_DIRECTORY,
+           "verbose:+" => \$VERBOSE,
+           "central-commit:s" => \$CENTRAL_COMMIT,
+                   "fork-limit:i" => \$FORK_LIMIT)) {
+  print STDERR $usage;
   exit 1;
 }
-my($GIT_REPOSITORY_PATH, $OUTPUT_DIRECTORY, $FORK_LIMIT, $VERBOSE) = @ARGV;
-$VERBOSE = 0 if not defined $VERBOSE;
-$FORK_LIMIT = 1 if not defined $FORK_LIMIT;
+if (not defined $GIT_REPOSITORY_PATH) {
+  print STDERR "--repository is a required command line argument.\n";
+  print STDERR $usage;
+  exit 1;
+}
+if (not defined $OUTPUT_DIRECTORY) {
+  print STDERR "--output-dir is a required command line argument.\n";
+  print STDERR $usage;
+  exit 1;
+}
 
 my $LOG_DIR = File::Spec->catfile($OUTPUT_DIRECTORY, ".logs");
 remove_tree($LOG_DIR) if -d $LOG_DIR;
 make_path($LOG_DIR, {mode => 0750});
 die "The directory, $OUTPUT_DIRECTORY, must be a writeable directory" unless -d $OUTPUT_DIRECTORY and -w $OUTPUT_DIRECTORY;
 die "The log directory, $LOG_DIR, must be a writeable directory" unless -d $LOG_DIR and -w $LOG_DIR;
+
+my @WHITELIST_COMMITS;
+
+# Snarf in data
+
+while (my $line = <STDIN>) {
+  chomp $line;
+  die "badly formatted commit ID: $line" unless $line =~ /^[a-z0-9]{40,40}$/;
+  $WHITELIST_COMMIT_IDS{$line} = $line;
+}
+close STDIN;
 ##############################################################################
-sub ProcessCommit($$) {
-  my($commitId, $pid) = @_;
+# ProcessCommit is the primary function that processes a commit to generate
+# the blame data.  If $fileListRef is defined, it should be a list reference,
+# where the list contains a list of pathnames to run git blame on.  If it is
+# undefined, then the file list will be chosen from the commit id
+
+sub ProcessCommit($$;$) {
+  my($commitId, $pid, $fileListRef) = @_;
   my $logFile = File::Spec->catfile($LOG_DIR, "${commitId}.${pid}.log");
   open(LOG, ">", $logFile);
   my $now = strftime("%Y-%m-%d %H:%M:%S", localtime);
@@ -104,15 +138,25 @@ sub ProcessCommit($$) {
   close LOG;
 }
 ##############################################################################
-# Mainline of script
+sub RunCentralCommitMode($) {
+  my($centralCommitId) = @_;
 
-my @unfinishedCommitIds;
+  my $gitRepository = Git::Repository->new(git_dir => $GIT_REPOSITORY_PATH);
 
-while (my $line = <STDIN>) {
-  chomp $line;
-  die "badly formatted commit ID: $line" unless $line =~ /^[a-z0-9]{40,40}$/;
-  push(@unfinishedCommitIds, $line);
+  foreach my $commitId (keys %WHITELIST_COMMIT_IDS) {
+    my(@commitFiles) = $gitRepository->run('show', '--pretty="format:"', '--name-only');
+    print join("\n", @commitFiles);
+  }
 }
+
+##############################################################################
+# Main line of script
+
+if (defined $CENTRAL_COMMIT) {
+  RunCentralCommitMode($CENTRAL_COMMIT);
+}
+
+exit 0;
 
 my %childProcesses;
 my %finishedCommits;
@@ -130,7 +174,7 @@ $SIG{CHLD} = sub {
   }
 };
 
-foreach my $commitId (@unfinishedCommitIds) {
+foreach my $commitId (keys %WHITELIST_COMMIT_IDS) {
   my $remainingCount = scalar(keys %childProcesses);
   while ($remainingCount >=  $FORK_LIMIT) {
     print STDERR "Sleep a bit while $remainingCount children going for these commits ",
@@ -159,7 +203,7 @@ while (scalar(keys %childProcesses) >  0) {
   sleep 10;
 }
 
-my $startCnt = scalar(@unfinishedCommitIds);
+my $startCnt = scalar(keys %WHITELIST_COMMIT_IDS);
 my $doneCnt = scalar(keys %finishedCommits);
 print STDERR "ERROR: all children completed but ", $doneCnt - $startCnt, " not completed\n";
 
@@ -172,7 +216,7 @@ foreach my $commitId (keys %finishedCommits) {
 }
 
 
-# git show --pretty="format:" --name-only
+# 
 # git blame  -M -M -M -C -C -C -w -f -n -l
 
 #
